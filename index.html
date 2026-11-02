@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <title>レジシステム</title>
+</head>
+
+<body style="margin: 0; position: fixed; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; font-family: 'Helvetica Neue', Arial, 'Hiragino Sans', sans-serif; background-color: #f4f7f6; color: #000000; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation;">
+
+<div style="display: flex; flex-direction: column; width: 100%; height: 100%; box-sizing: border-box; padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);">
+
+  <!-- ページ切り替えタブ -->
+  <div style="display: flex; flex: 0 0 auto; background-color: #2c3e50;">
+    <button id="tab-pos" onclick="showView('pos')" style="flex: 1; padding: 1.6vmin 0; border: none; font-size: clamp(16px, 3vmin, 28px); font-weight: bold; cursor: pointer; color: #ffffff; background-color: #3498db;">会計</button>
+    <button id="tab-rec" onclick="showView('rec')" style="flex: 1; padding: 1.6vmin 0; border: none; font-size: clamp(16px, 3vmin, 28px); font-weight: bold; cursor: pointer; color: #ffffff; background-color: #2c3e50;">売上の記録</button>
+  </div>
+
+  <!-- ===== 1ページ目：会計（スクロールしない固定画面） ===== -->
+  <div id="view-pos" style="flex: 1 1 0; min-height: 0; display: flex; flex-direction: row; gap: 2vmin; padding: 2vmin; box-sizing: border-box;">
+
+    <!-- 表示エリア -->
+    <div id="info" style="flex: 1 1 0; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 1.4vmin;">
+
+      <div style="flex: 1 1 0; min-height: 0; display: flex; align-items: center; gap: 2vmin; padding: 0 2.4vmin; background-color: #ffffff; border: 0.4vmin solid #cccccc; border-radius: 1.6vmin;">
+        <span style="font-size: 3.4vmin; font-weight: bold; white-space: nowrap;">商品</span>
+        <select id="item" onchange="refresh()" style="flex: 1; min-width: 0; height: 78%; font-size: 4.2vmin; border: 1px solid #cccccc; border-radius: 1vmin; background-color: #ffffff; color: #000000;">
+          <option value="700">ふわ姫パン (700円)</option>
+        </select>
+      </div>
+
+      <div id="row-qty" onclick="setStage('qty')" style="flex: 1.8 1 0; min-height: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 2.4vmin; background-color: #ffffff; border: 0.8vmin solid #cccccc; border-radius: 1.6vmin; cursor: pointer;">
+        <span style="font-size: 3.6vmin; font-weight: bold;">個数</span>
+        <span>
+          <span id="qty-text" style="font-size: 9vmin; font-weight: bold;">1</span>
+          <span style="font-size: 3.6vmin; font-weight: bold; margin-left: 1vmin;">個</span>
+        </span>
+      </div>
+
+      <div style="flex: 1.4 1 0; min-height: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 2.4vmin; background-color: #ffffff; border: 0.4vmin solid #cccccc; border-radius: 1.6vmin;">
+        <span style="font-size: 3.6vmin; font-weight: bold;">合計金額</span>
+        <span>
+          <span id="display-total" style="font-size: 7.5vmin; font-weight: bold; color: #e74c3c;">0</span>
+          <span style="font-size: 3.6vmin; font-weight: bold; margin-left: 1vmin; color: #e74c3c;">円</span>
+        </span>
+      </div>
+
+      <div id="row-cash" onclick="setStage('cash')" style="flex: 1.8 1 0; min-height: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 2.4vmin; background-color: #ffffff; border: 0.8vmin solid #cccccc; border-radius: 1.6vmin; cursor: pointer;">
+        <span style="font-size: 3.6vmin; font-weight: bold;">預かり</span>
+        <span>
+          <span id="cash-text" style="font-size: 9vmin; font-weight: bold;">—</span>
+          <span style="font-size: 3.6vmin; font-weight: bold; margin-left: 1vmin;">円</span>
+        </span>
+      </div>
+
+      <div style="flex: 2.4 1 0; min-height: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 2.4vmin; background-color: #eafaf1; border: 0.4vmin solid #27ae60; border-radius: 1.6vmin;">
+        <span style="font-size: 3.6vmin; font-weight: bold;">お釣り</span>
+        <span>
+          <span id="display-change" style="font-size: 11vmin; font-weight: bold; color: #27ae60;">0</span>
+          <span id="change-unit" style="font-size: 3.6vmin; font-weight: bold; margin-left: 1vmin; color: #27ae60;">円</span>
+        </span>
+      </div>
+
+      <!-- メッセージ表示（高さ固定なので、画面が動きません） -->
+      <div id="status" style="flex: 0 0 auto; height: clamp(22px, 4.4vmin, 40px); line-height: clamp(22px, 4.4vmin, 40px); font-size: clamp(13px, 2.8vmin, 24px); font-weight: bold; text-align: center; color: #555555; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;"></div>
+    </div>
+
+    <!-- テンキー（JavaScriptで作成） -->
+    <div id="keypad" style="flex: 1 1 0; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(5, 1fr); gap: 1.6vmin;"></div>
+  </div>
+
+  <!-- ===== 2ページ目：売上の記録 ===== -->
+  <div id="view-rec" style="display: none; flex: 1 1 0; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 3vmin; box-sizing: border-box; font-size: clamp(15px, 2.6vmin, 24px);">
+
+    <div style="margin-bottom: 1vmin;">
+      記録：<span id="sum-count" style="font-weight: bold;">0</span> 件 ／ 売上合計：<span id="sum-amount" style="font-weight: bold;">0</span> 円
+    </div>
+    <div style="color: #555555; margin-bottom: 2vmin;">
+      うちCSV未書き出し：<span id="sum-unexported">0</span> 件
+    </div>
+
+    <button onclick="exportCsv()" style="width: 100%; padding: 2vmin; border: none; border-radius: 1vmin; font-size: 1.1em; font-weight: bold; cursor: pointer; background-color: #3498db; color: #ffffff;">CSVに書き出す（Excel・スプレッドシート用）</button>
+    <button onclick="undoLast()" style="width: 100%; padding: 1.8vmin; border: 1px solid #cccccc; border-radius: 1vmin; font-size: 1em; cursor: pointer; margin-top: 1.6vmin; background-color: #ffffff; color: #000000;">直前の売上を取り消す</button>
+    <button onclick="deleteExported()" style="width: 100%; padding: 1.8vmin; border: 1px solid #e74c3c; border-radius: 1vmin; font-size: 1em; cursor: pointer; margin-top: 1.6vmin; background-color: #ffffff; color: #e74c3c;">書き出し済みの売上を削除する</button>
+
+    <div id="rec-status" style="text-align: center; font-weight: bold; margin: 2vmin 0; min-height: 1.5em;"></div>
+
+    <div style="font-weight: bold; margin-bottom: 1vmin; border-bottom: 2px solid #cccccc; padding-bottom: 1vmin;">記録一覧（新しい順）</div>
+    <div id="sale-list"></div>
+    <div id="list-note" style="color: #555555; margin-top: 1vmin;"></div>
+  </div>
+
+</div>
+
+<script>
+  const STORAGE_KEY = 'salesRecords';
+  const QTY_MAX = 3;     // 個数の最大桁数
+  const CASH_MAX = 7;    // 預かり金額の最大桁数
+  const $ = function(id) { return document.getElementById(id); };
+
+  let stage = 'qty';     // 今入力している欄：'qty'（個数）／'cash'（預かり金額）
+  let qty = '';          // 個数（空のときは1個として扱う）
+  let cash = '';         // 預かり金額（空のときは未入力）
+  let toastTimer = null;
+  let enterBtn = null;
+
+  // ---------- 端末内の売上記録 ----------
+  function loadSales() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch (e) { return []; }
+  }
+  function saveSales(list) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    updateSummary();
+  }
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function formatDate(iso) {
+    const d = new Date(iso);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' +
+           pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  }
+
+  // ---------- 計算 ----------
+  function qtyValue() { return qty === '' ? 1 : parseInt(qty, 10); }
+  function totalValue() { return parseInt($('item').value, 10) * qtyValue(); }
+
+  // ---------- 表示の更新 ----------
+  function refresh() {
+    const t = totalValue();
+
+    const qEl = $('qty-text');
+    qEl.textContent = qty === '' ? '1' : qty;
+    qEl.style.color = qty === '' ? '#aaaaaa' : '#000000';
+
+    $('display-total').textContent = t.toLocaleString();
+
+    const cEl = $('cash-text');
+    cEl.textContent = cash === '' ? '—' : parseInt(cash, 10).toLocaleString();
+    cEl.style.color = cash === '' ? '#aaaaaa' : '#000000';
+
+    const ch = $('display-change');
+    const unit = $('change-unit');
+    if (cash === '') {
+      ch.textContent = '0';
+      ch.style.color = '#27ae60';
+      unit.style.display = 'inline';
+    } else {
+      const diff = parseInt(cash, 10) - t;
+      if (diff >= 0) {
+        ch.textContent = diff.toLocaleString();
+        ch.style.color = '#27ae60';
+        unit.style.display = 'inline';
+      } else {
+        ch.textContent = '不足';
+        ch.style.color = '#e74c3c';
+        unit.style.display = 'none';
+      }
+    }
+
+    // 入力中の欄を青枠で強調
+    $('row-qty').style.borderColor = stage === 'qty' ? '#3498db' : '#cccccc';
+    $('row-qty').style.backgroundColor = stage === 'qty' ? '#eaf4fd' : '#ffffff';
+    $('row-cash').style.borderColor = stage === 'cash' ? '#3498db' : '#cccccc';
+    $('row-cash').style.backgroundColor = stage === 'cash' ? '#eaf4fd' : '#ffffff';
+
+    if (enterBtn) enterBtn.textContent = stage === 'qty' ? '決定 ▶' : '確定';
+  }
+
+  function setStatus(color, text) {
+    const el = $('status');
+    el.style.color = color;
+    el.textContent = text;
+  }
+  function hint() {
+    setStatus('#555555', stage === 'qty' ? '個数を入力 →「決定」（入力なしは1個）' : '預かり金額を入力 →「確定」');
+  }
+  function toast(color, text) {
+    setStatus(color, text);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hint, 3000);
+  }
+
+  function setStage(s) {
+    stage = s;
+    hint();
+    refresh();
+  }
+
+  // ---------- テンキーの操作 ----------
+  function pressDigit(d) {
+    if (stage === 'qty') {
+      if (qty === '' && (d === '0' || d === '00')) return;
+      if ((qty + d).length <= QTY_MAX) qty += d;
+    } else {
+      if (cash === '' && (d === '0' || d === '00')) return;
+      if ((cash + d).length <= CASH_MAX) cash += d;
+    }
+    hint();
+    refresh();
+  }
+  function clearNum() {
+    if (stage === 'qty') qty = ''; else cash = '';
+    hint();
+    refresh();
+  }
+  function backspaceNum() {
+    if (stage === 'qty') qty = qty.slice(0, -1); else cash = cash.slice(0, -1);
+    hint();
+    refresh();
+  }
+
+  // 決定／確定ボタン
+  function pressEnter() {
+    if (stage === 'qty') {
+      setStage('cash');          // 個数 → 預かり金額へ自動で移る
+      return;
+    }
+    // 預かり金額の入力中：確定（記録）
+    if (cash !== '' && parseInt(cash, 10) < totalValue()) {
+      toast('#e74c3c', '預かり金額が不足しています');
+      return;
+    }
+    recordSale();
+  }
+
+  // ---------- 売上を記録 ----------
+  function recordSale() {
+    const sel = $('item');
+    const itemName = sel.options[sel.selectedIndex].text.split(' (')[0];
+    const list = loadSales();
+    list.push({
+      time: new Date().toISOString(),
+      itemName: itemName,
+      quantity: qtyValue(),
+      total: totalValue(),
+      exported: false
+    });
+    try {
+      saveSales(list);
+    } catch (e) {
+      toast('#e74c3c', '端末に保存できませんでした。記録されていません');
+      return;
+    }
+    const n = list.length;
+    qty = '';
+    cash = '';
+    stage = 'qty';
+    refresh();
+    toast('#27ae60', '✓ 記録しました（' + n + '件目）');
+  }
+
+  // ---------- テンキーを作る ----------
+  const KEY_BASE = 'width: 100%; height: 100%; min-height: 0; border: none; border-radius: 1.6vmin; font-weight: bold; cursor: pointer; touch-action: manipulation; -webkit-user-select: none; user-select: none; font-size: clamp(22px, 8vmin, 64px); ';
+
+  function makeKey(label, bg, color, handler, span) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.style.cssText = KEY_BASE + 'background-color: ' + bg + '; color: ' + color + ';' + (span ? ' grid-column: span ' + span + ';' : '');
+    // 押している間だけ、色を濃くして少し縮める
+    const release = function() { b.style.filter = ''; b.style.transform = ''; };
+    b.addEventListener('pointerdown', function() { b.style.filter = 'brightness(0.82)'; b.style.transform = 'scale(0.97)'; });
+    b.addEventListener('pointerup', release);
+    b.addEventListener('pointerleave', release);
+    b.addEventListener('pointercancel', release);
+    b.addEventListener('click', handler);
+    return b;
+  }
+
+  function buildKeypad() {
+    const pad = $('keypad');
+    ['7', '8', '9', '4', '5', '6', '1', '2', '3'].forEach(function(d) {
+      pad.appendChild(makeKey(d, '#e0e0e0', '#333333', function() { pressDigit(d); }));
+    });
+    pad.appendChild(makeKey('C', '#f87171', '#ffffff', clearNum));
+    pad.appendChild(makeKey('0', '#e0e0e0', '#333333', function() { pressDigit('0'); }));
+    pad.appendChild(makeKey('00', '#e0e0e0', '#333333', function() { pressDigit('00'); }));
+    enterBtn = makeKey('決定 ▶', '#4ade80', '#ffffff', pressEnter, 2);
+    enterBtn.style.fontSize = 'clamp(20px, 6vmin, 52px)';
+    pad.appendChild(enterBtn);
+    pad.appendChild(makeKey('⌫', '#fca5a5', '#ffffff', backspaceNum));
+  }
+
+  // ---------- 画面の向きに合わせた配置 ----------
+  function applyLayout() {
+    const landscape = window.innerWidth >= window.innerHeight;
+    $('view-pos').style.flexDirection = landscape ? 'row' : 'column';
+    $('info').style.flex = landscape ? '1 1 0' : '1.25 1 0';
+  }
+
+  // ---------- ページ切り替え ----------
+  function showView(v) {
+    const pos = (v === 'pos');
+    $('view-pos').style.display = pos ? 'flex' : 'none';
+    $('view-rec').style.display = pos ? 'none' : 'block';
+    $('tab-pos').style.backgroundColor = pos ? '#3498db' : '#2c3e50';
+    $('tab-rec').style.backgroundColor = pos ? '#2c3e50' : '#3498db';
+    if (!pos) updateSummary();
+  }
+
+  // ---------- 2ページ目：記録の表示 ----------
+  function updateSummary() {
+    const list = loadSales();
+    const amount = list.reduce(function(sum, s) { return sum + s.total; }, 0);
+    $('sum-count').textContent = list.length;
+    $('sum-amount').textContent = amount.toLocaleString();
+    $('sum-unexported').textContent = list.filter(function(s) { return !s.exported; }).length;
+
+    const box = $('sale-list');
+    box.textContent = '';
+    list.slice().reverse().slice(0, 200).forEach(function(s) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display: flex; justify-content: space-between; padding: 1.4vmin 0; border-bottom: 1px solid #dddddd;';
+      const l = document.createElement('span');
+      l.textContent = formatDate(s.time).slice(5, 16) + '　' + s.itemName + ' ×' + s.quantity;
+      const r = document.createElement('span');
+      r.textContent = s.total.toLocaleString() + '円' + (s.exported ? ' ✓' : '');
+      row.appendChild(l);
+      row.appendChild(r);
+      box.appendChild(row);
+    });
+    $('list-note').textContent = list.length > 200 ? '新しい200件のみ表示しています（CSVには全件が入ります）' : '';
+  }
+
+  function setRecStatus(color, text) {
+    const el = $('rec-status');
+    el.style.color = color;
+    el.textContent = text;
+  }
+
+  function undoLast() {
+    const list = loadSales();
+    if (list.length === 0) {
+      setRecStatus('#e74c3c', '取り消せる売上がありません。');
+      return;
+    }
+    const last = list[list.length - 1];
+    if (!confirm('直前の売上を取り消しますか？\n' + last.itemName + ' ×' + last.quantity + '　' + last.total.toLocaleString() + '円')) return;
+    list.pop();
+    saveSales(list);
+    setRecStatus('#e67e22', '直前の売上を取り消しました。');
+  }
+
+  // ---------- CSV書き出し ----------
+  function csvEscape(v) {
+    const s = String(v);
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  async function exportCsv() {
+    const list = loadSales();
+    if (list.length === 0) {
+      setRecStatus('#e74c3c', '書き出す売上がありません。');
+      return;
+    }
+    const lines = ['日時,商品名,個数,合計金額'];
+    list.forEach(function(s) {
+      lines.push([formatDate(s.time), s.itemName, s.quantity, s.total].map(csvEscape).join(','));
+    });
+    // 先頭の\ufeffは、Excelで日本語が文字化けしないための目印
+    const csv = '\ufeff' + lines.join('\r\n') + '\r\n';
+
+    const now = new Date();
+    const fileName = 'sales_' + now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) +
+                     '_' + pad(now.getHours()) + pad(now.getMinutes()) + '.csv';
+    const file = new File([csv], fileName, { type: 'text/csv' });
+
+    let done = false;
+    // iPad：共有メニュー（メール、AirDrop、ファイル等）を開く
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: fileName });
+        done = true;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;   // 共有メニューを閉じただけ
+      }
+    }
+    // 共有が使えないとき：ダウンロード
+    if (!done) {
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function() { URL.revokeObjectURL(url); }, 10000);
+      done = true;
+    }
+
+    if (done) {
+      saveSales(list.map(function(s) { return Object.assign({}, s, { exported: true }); }));
+      setRecStatus('#27ae60', 'CSVを書き出しました。保存できたか必ず確認してください。');
+    }
+  }
+
+  function deleteExported() {
+    const list = loadSales();
+    const exportedCount = list.filter(function(s) { return s.exported; }).length;
+    if (exportedCount === 0) {
+      setRecStatus('#e74c3c', '削除できる「書き出し済み」の売上がありません。');
+      return;
+    }
+    if (!confirm('書き出し済みの売上 ' + exportedCount + ' 件を、この端末から削除します。\nCSVファイルが保存できていることを確認しましたか？\n（削除すると元に戻せません）')) return;
+    saveSales(list.filter(function(s) { return !s.exported; }));
+    setRecStatus('#e67e22', '書き出し済みの売上を削除しました。');
+  }
+
+  // ---------- キーボード（外付けキーボード・パソコンでの確認用） ----------
+  document.addEventListener('keydown', function(e) {
+    if (e.target && e.target.tagName === 'SELECT') return;
+    if ($('view-pos').style.display === 'none') return;
+    if (/^[0-9]$/.test(e.key)) pressDigit(e.key);
+    else if (e.key === 'Enter') pressEnter();
+    else if (e.key === 'Backspace') backspaceNum();
+    else if (e.key === 'Escape' || e.key === 'Delete') clearNum();
+  });
+
+  // ---------- 起動時の処理 ----------
+  buildKeypad();
+  applyLayout();
+  window.addEventListener('resize', applyLayout);
+  window.addEventListener('orientationchange', applyLayout);
+  hint();
+  refresh();
+  updateSummary();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
+  // 端末のデータが自動で消されにくくなるよう、保存の継続を依頼する
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+</script>
+</body>
+</html>
